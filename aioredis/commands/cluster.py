@@ -1,4 +1,4 @@
-from aioredis.util import wait_ok
+from aioredis.util import wait_ok, wait_convert
 
 
 class ClusterCommandsMixin:
@@ -51,7 +51,8 @@ class ClusterCommandsMixin:
 
     def cluster_info(self):
         """Provides info about Redis Cluster node state."""
-        pass    # TODO: Implement
+        fut = self._conn.execute(b'CLUSTER', b'INFO', encoding='utf-8')
+        return wait_convert(fut, parse_info)
 
     def cluster_keyslot(self, key):
         """Returns the hash slot of the specified key."""
@@ -98,3 +99,13 @@ class ClusterCommandsMixin:
     def cluster_slots(self):
         """Get array of Cluster slot to node mappings."""
         pass    # TODO: Implement
+
+
+def parse_info(info):
+    res = {}
+    for l in info.splitlines():
+        k, v = l.split(':')
+        if v.isnumeric():
+            v = int(v)
+        res[k] = v
+    return res

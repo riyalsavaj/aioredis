@@ -10,8 +10,9 @@ env:
   - REDIS_PORT_2=6380
   - REDIS_SOCKET=/tmp/aioredis.sock
   matrix:
-  - USE_REDIS_2_6=false
-  - USE_REDIS_2_6=true
+  # - USE_REDIS_2_6=false
+  # - USE_REDIS_2_6=true
+  - REDIS_CLUSTER=true
 
 
 before_install:
@@ -23,6 +24,11 @@ before_install:
     sudo apt-get install redis-server/oneiric -V --force-yes;
   else
     sudo apt-get install redis-server -V;
+  fi
+- >
+  if [ "$REDIS_CLUSTER" = "true" ]; then
+    export EXTRA_ARGS_1="--cluster-enabled yes --cluster-config-file /tmp/cluster1.conf";
+    export EXTRA_ARGS_2="--cluster-enabled yes --cluster-config-file /tmp/cluster2.conf";
   fi
 # - redis-server --version
 
@@ -42,17 +48,23 @@ before_script:
   --unixsocket $REDIS_SOCKET
   --port $REDIS_PORT_1
   --save ""
+  $EXTRA_ARGS_1
 # second redis instance, yet for migrate command tests
 - >
   redis-server --daemonize yes
   --pidfile ./redis-server-2.pid
   --port $REDIS_PORT_2
   --save ""
+  $EXTRA_ARGS_2
 - sleep 3
 - redis-cli -s $REDIS_SOCKET PING
 - redis-cli -p $REDIS_PORT_2 PING
 - export REDIS_VERSION="$(redis-cli -s $REDIS_SOCKET INFO SERVER | sed -n 2p)"
 - echo $REDIS_VERSION
+- >
+  if [ "$REDIS_CLUSTER" = "true" ]; then
+    redis-cli -p $REDIS_PORT_1 cluster meet 127.0.0.1 $REDIS_PORT_2;
+  fi
 
 script:
 - pyflakes aioredis tests
