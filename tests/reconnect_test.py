@@ -1,7 +1,10 @@
-from ._testutil import BaseTest, run_until_complete
+import unittest
+
+from ._testutil import BaseTest, run_until_complete, REDIS_CLUSTER
 from aioredis import create_reconnecting_redis
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class ReconnectTest(BaseTest):
 
     @run_until_complete

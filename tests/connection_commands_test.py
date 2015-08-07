@@ -1,7 +1,10 @@
-from ._testutil import RedisTest, run_until_complete
+import unittest
+
+from ._testutil import RedisTest, run_until_complete, REDIS_CLUSTER
 from aioredis import ReplyError
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class ConnectionCommandsTest(RedisTest):
 
     @run_until_complete

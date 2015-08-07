@@ -1,9 +1,11 @@
+import unittest
 import asyncio
 
-from ._testutil import BaseTest, run_until_complete
+from ._testutil import BaseTest, run_until_complete, REDIS_CLUSTER
 from aioredis import RedisPool, ReplyError
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class PoolTest(BaseTest):
 
     def _assert_defaults(self, pool):

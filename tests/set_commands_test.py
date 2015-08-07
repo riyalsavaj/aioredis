@@ -1,9 +1,13 @@
 import asyncio
 import unittest
 
-from ._testutil import RedisTest, run_until_complete, REDIS_VERSION
+from ._testutil import (
+    RedisTest, run_until_complete,
+    REDIS_VERSION, REDIS_CLUSTER,
+    )
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class SetCommandsTest(RedisTest):
 
     @asyncio.coroutine

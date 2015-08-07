@@ -2,10 +2,11 @@ import unittest
 import asyncio
 import os
 
-from ._testutil import BaseTest, run_until_complete
+from ._testutil import BaseTest, run_until_complete, REDIS_CLUSTER
 from aioredis import ReplyError, ProtocolError, RedisError
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class ConnectionTest(BaseTest):
 
     @run_until_complete

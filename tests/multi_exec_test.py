@@ -4,8 +4,10 @@ from unittest import mock
 
 from aioredis.commands import MultiExec
 from aioredis.commands import Redis
+from ._testutil import REDIS_CLUSTER
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class MultiExecTest(unittest.TestCase):
 
     def test_global_loop(self):

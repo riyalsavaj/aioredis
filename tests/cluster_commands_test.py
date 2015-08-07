@@ -1,10 +1,9 @@
-import os
 import unittest
 
-from ._testutil import RedisTest, run_until_complete
+from ._testutil import RedisTest, run_until_complete, REDIS_CLUSTER
 
 
-@unittest.skipIf(os.environ.get('REDIS_CLUSTER') != 'true',
+@unittest.skipIf(not REDIS_CLUSTER,
                  "Cluster command tests expect redis cluster")
 class GenericCommandsTest(RedisTest):
 

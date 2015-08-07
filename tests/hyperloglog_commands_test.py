@@ -1,10 +1,14 @@
 import unittest
 
-from ._testutil import RedisTest, run_until_complete, REDIS_VERSION
+from ._testutil import (
+    RedisTest, run_until_complete,
+    REDIS_VERSION, REDIS_CLUSTER,
+    )
 
 
 @unittest.skipIf(REDIS_VERSION < (2, 8, 9),
                  'HyperLogLog works only with redis>=2.8.9')
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class HyperLogLogCommandsTest(RedisTest):
 
     @run_until_complete

@@ -1,9 +1,11 @@
+import unittest
 import asyncio
 
-from ._testutil import RedisTest, run_until_complete
+from ._testutil import RedisTest, run_until_complete, REDIS_CLUSTER
 from aioredis import ReplyError
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class ListCommandsTest(RedisTest):
 
     @run_until_complete

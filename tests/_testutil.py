@@ -17,6 +17,8 @@ else:
     else:
         REDIS_VERSION = (0, 0, 0)
 
+REDIS_CLUSTER = os.environ.get('REDIS_CLUSTER') == 'true'
+
 
 def run_until_complete(fun):
     if not asyncio.iscoroutinefunction(fun):

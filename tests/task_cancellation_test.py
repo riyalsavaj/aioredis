@@ -1,8 +1,10 @@
+import unittest
 import asyncio
 
-from ._testutil import BaseTest, run_until_complete
+from ._testutil import BaseTest, run_until_complete, REDIS_CLUSTER
 
 
+@unittest.skipIf(REDIS_CLUSTER, "Skipped on redis cluster")
 class TaskCancellationTest(BaseTest):
 
     @run_until_complete
