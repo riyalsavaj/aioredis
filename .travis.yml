@@ -73,10 +73,14 @@ script:
 
 # checking examples
 - >
-  for example in $(find $PWD/examples/ -name "*.py"); do
-  echo "Running ${example}";
-  python3 ${example} || exit 1;
-  done;
+  if [ "$REDIS_CLUSTER" = "true" ]; then
+    echo "Skip running examples on redis cluster (for now).";
+  else
+    for example in $(find $PWD/examples/ -name "*.py"); do
+      echo "Running ${example}";
+      python3 ${example} || exit 1;
+    done;
+  fi;
 
 after_script:
 - coveralls

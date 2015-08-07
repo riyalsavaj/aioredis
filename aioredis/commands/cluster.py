@@ -65,7 +65,8 @@ class ClusterCommandsMixin:
 
     def cluster_nodes(self):
         """Get Cluster config for the node."""
-        pass    # TODO: Implement
+        fut = self._conn.execute(b'CLUSTER', b'NODES', encoding='utf-8')
+        return wait_convert(fut, parse_nodes)
 
     def cluster_replicate(self, node_id):
         """Reconfigure a node as a slave of the specified master node."""
@@ -109,3 +110,7 @@ def parse_info(info):
             v = int(v)
         res[k] = v
     return res
+
+
+def parse_nodes(nodes):
+    return nodes.splitlines()
