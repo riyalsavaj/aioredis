@@ -1,4 +1,19 @@
+from collections import namedtuple, Iterable
+
 from aioredis.util import wait_ok, wait_convert
+
+
+_NodeInfo = namedtuple("NodeInfo",
+                       "id ip port flags master ping_sent pong_recv"
+                       " config_epoch link_state slots")
+
+
+class NodeInfo(_NodeInfo):
+    __slots__ = ()
+
+    @property
+    def addr(self):
+        return self.ip, self.port
 
 
 class ClusterCommandsMixin:
@@ -7,9 +22,16 @@ class ClusterCommandsMixin:
     For commands details see: http://redis.io/commands#cluster
     """
 
-    def cluster_add_slots(self, slot, *slots):
+    def cluster_add_slots(self, slot_or_iterable, *more):
         """Assign new hash slots to receiving node."""
-        slots = (slot,) + slots
+        slots = set()
+        for item in (slot_or_iterable,) + more:
+            if isinstance(item, int):
+                slots.add(item)
+            elif isinstance(item, Iterable):
+                slots.update(item)
+            else:
+                raise TypeError("All arguments must ints or iterable of ints")
         if not all(isinstance(s, int) for s in slots):
             raise TypeError("All parameters must be of type int")
         fut = self._conn.execute(b'CLUSTER', b'ADDSLOTS', *slots)
@@ -99,7 +121,9 @@ class ClusterCommandsMixin:
 
     def cluster_slots(self):
         """Get array of Cluster slot to node mappings."""
-        pass    # TODO: Implement
+        fut = self._conn.execute(b'CLUSTER', b'SLOTS')
+        # TODO: fix ip encoding
+        return fut
 
 
 def parse_info(info):
@@ -113,4 +137,20 @@ def parse_info(info):
 
 
 def parse_nodes(nodes):
-    return nodes.splitlines()
+    res = []
+    for line in nodes.splitlines():
+        parts = line.split()
+        id, addr, flags, master, *parts = parts
+        ping, pong, epoch, link, *slots = parts
+        ip, port = addr.split(':')
+        res.append(NodeInfo(id=id,
+                            ip=ip,
+                            port=int(port),
+                            flags=frozenset(flags.split(',')),
+                            master=master,
+                            ping_sent=int(ping),
+                            pong_recv=int(pong),
+                            config_epoch=int(epoch),
+                            link_state=link,
+                            slots=slots))
+    return res

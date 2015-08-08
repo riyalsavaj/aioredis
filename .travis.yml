@@ -27,8 +27,8 @@ before_install:
   fi
 - >
   if [ "$REDIS_CLUSTER" = "true" ]; then
-    export EXTRA_ARGS_1="--cluster-enabled yes --cluster-config-file /tmp/cluster1.conf";
-    export EXTRA_ARGS_2="--cluster-enabled yes --cluster-config-file /tmp/cluster2.conf";
+    export EXTRA_ARGS_1="--cluster-enabled yes --cluster-config-file /tmp/cluster1.conf --bind 127.0.0.1";
+    export EXTRA_ARGS_2="--cluster-enabled yes --cluster-config-file /tmp/cluster2.conf --bind 127.0.0.1";
   fi
 # - redis-server --version
 
@@ -61,10 +61,6 @@ before_script:
 - redis-cli -p $REDIS_PORT_2 PING
 - export REDIS_VERSION="$(redis-cli -s $REDIS_SOCKET INFO SERVER | sed -n 2p)"
 - echo $REDIS_VERSION
-- >
-  if [ "$REDIS_CLUSTER" = "true" ]; then
-    redis-cli -p $REDIS_PORT_1 cluster meet 127.0.0.1 $REDIS_PORT_2;
-  fi
 
 script:
 - pyflakes aioredis tests
