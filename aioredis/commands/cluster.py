@@ -49,9 +49,16 @@ class ClusterCommandsMixin:
                             .format(type(slot)))
         return self._conn.execute(b'CLUSTER', b'COUNTKEYSINSLOT', slot)
 
-    def cluster_del_slots(self, slot, *slots):
+    def cluster_del_slots(self, slot_or_iterable, *more):
         """Set hash slots as unbound in receiving node."""
-        slots = (slot,) + slots
+        slots = set()
+        for item in (slot_or_iterable,) + more:
+            if isinstance(item, int):
+                slots.add(item)
+            elif isinstance(item, Iterable):
+                slots.update(item)
+            else:
+                raise TypeError("All arguments must ints or iterable of ints")
         if not all(isinstance(s, int) for s in slots):
             raise TypeError("All parameters must be of type int")
         fut = self._conn.execute(b'CLUSTER', b'DELSLOTS', *slots)

@@ -67,6 +67,40 @@ class GenericCommandsTest(RedisTest):
             ])
 
     @run_until_complete
+    def test_count_failure_reports(self):
+        nodes = yield from self.redis.cluster_nodes()
+        node_id = nodes[0].id
+        res = yield from self.redis.cluster_count_failure_reports(node_id)
+        self.assertEqual(res, 0)
+
+    @run_until_complete
+    def test_del_slots(self):
+        ok = yield from self.redis.cluster_add_slots(range(10))
+        self.assertTrue(ok)
+        ok = yield from self.redis.cluster_del_slots(range(2, 4))
+        self.assertTrue(ok)
+        slots = yield from self.redis.cluster_slots()
+        self.assertEqual(slots, [
+            [0, 1, [b'127.0.0.1', self.redis_port]],
+            [4, 9, [b'127.0.0.1', self.redis_port]],
+            ])
+
+    @run_until_complete
+    def test_get_keys_in_slots(self):
+        ok = yield from self.redis.cluster_add_slots(0)
+        self.assertTrue(ok)
+        ok = yield from self.redis_node2.cluster_add_slots(1)
+        self.assertTrue(ok)
+        import asyncio
+        yield from asyncio.sleep(5, loop=self.loop)
+
+        res = yield from self.redis.set('key', 'value')
+        self.assertTrue(res)
+
+        res = yield from self.redis.cluster_get_keys_in_slots(0, 10)
+        self.assertEqual(res, ['key'])
+
+    @run_until_complete
     def test_cluster_info(self):
         info = yield from self.redis.cluster_info()
         self.assertIsInstance(info, dict)
