@@ -2,6 +2,7 @@ import asyncio
 
 from aioredis.connection import create_connection
 from aioredis.util import _NOTSET
+from aioredis.errors import ConnectionClosedError
 from .generic import GenericCommandsMixin
 from .string import StringCommandsMixin
 from .hash import HashCommandsMixin
@@ -19,7 +20,6 @@ __all__ = ['create_redis', 'Redis', 'Pipeline', 'MultiExec']
 
 
 class AutoConnector(object):
-    closed = False
 
     def __init__(self, *conn_args, **conn_kwargs):
         self._conn_args = conn_args
@@ -27,6 +27,8 @@ class AutoConnector(object):
         self._conn = None
         self._loop = conn_kwargs.get('loop')
         self._lock = asyncio.Lock(loop=self._loop)
+        self._closed = False
+        self._close_waiter = asyncio.Event(loop=self._loop)
 
     def __repr__(self):
         return '<AutoConnector {!r}>'.format(self._conn)
@@ -38,13 +40,46 @@ class AutoConnector(object):
 
     @asyncio.coroutine
     def get_atomic_connection(self):
+        if self._closed:
+            raise ConnectionClosedError("Connection closed or corrupted")
         if self._conn is None or self._conn.closed:
             with (yield from self._lock):
+                if self._closed:
+                    raise ConnectionClosedError(
+                        "Connection closed or corrupted")
                 if self._conn is None or self._conn.closed:
                     conn = yield from create_connection(
                         *self._conn_args, **self._conn_kwargs)
                     self._conn = conn
         return self._conn
+
+    def close(self):
+        self._do_close()
+
+    def _do_close(self):
+        if self._closed:
+            return
+        self._closed = True
+        if self._conn is not None:
+            def set_event(f):
+                self._close_waiter.set()
+            self._conn.close()
+            self._conn.wait_closed().add_done_callback(set_event)
+        elif self._lock.locked():
+            def set_event(f):
+                self._lock.release()
+                self._close_waiter.set()
+            self._lock.acquire().add_done_callback(set_event)
+        else:
+            self._close_waiter.set()
+
+    @asyncio.coroutine
+    def wait_closed(self):
+        yield from self._close_waiter.wait()
+
+    @property
+    def closed(self):
+        return self._closed
 
 
 class Redis(GenericCommandsMixin, StringCommandsMixin,
