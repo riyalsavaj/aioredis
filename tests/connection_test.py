@@ -398,3 +398,15 @@ def test_execute_pubsub_errors(create_connection, loop, server):
         sub.execute_pubsub(
             'punsubscribe',
             Channel('chan:1', is_pattern=False, loop=loop))
+
+
+@pytest.mark.run_loop
+@pytest.mark.xfail
+def test_max_clients_reached(create_connection, loop, server):
+    conn1 = yield from create_connection(server.tcp_address, loop=loop)
+    ok = yield from conn1.execute("config", "set", "maxclients", 1)
+    assert ok == b'OK'
+
+    with pytest.raises(Exception):
+        # exception must be raised and connection must be closed
+        yield from create_connection(server.tcp_address, loop=loop)
