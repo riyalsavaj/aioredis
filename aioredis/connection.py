@@ -87,7 +87,10 @@ def create_connection(address, *, db=None, password=None, ssl=None,
             yield from conn.auth(password)
         if db is not None:
             yield from conn.select(db)
-    except Exception:
+        # NOTE: Fast error detection (eg max clients reached)
+        #   however this is a hack to populate _waiters
+        yield from conn.execute(b'PING')
+    except Exception as err:
         conn.close()
         yield from conn.wait_closed()
         raise

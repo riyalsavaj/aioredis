@@ -401,12 +401,12 @@ def test_execute_pubsub_errors(create_connection, loop, server):
 
 
 @pytest.mark.run_loop
-@pytest.mark.xfail
+@pytest.redis_version(2, 8, 0, reason="maxclients config setting")
 def test_max_clients_reached(create_connection, loop, server):
     conn1 = yield from create_connection(server.tcp_address, loop=loop)
     ok = yield from conn1.execute("config", "set", "maxclients", 1)
     assert ok == b'OK'
 
-    with pytest.raises(Exception):
+    with pytest.raises(RedisError):
         # exception must be raised and connection must be closed
         yield from create_connection(server.tcp_address, loop=loop)
