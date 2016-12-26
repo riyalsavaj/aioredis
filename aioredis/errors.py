@@ -1,3 +1,5 @@
+import enum
+
 __all__ = [
     'RedisError',
     'ProtocolError',
@@ -8,6 +10,7 @@ __all__ = [
     'ChannelClosedError',
     'ConnectionClosedError',
     'PoolClosedError',
+    'CloseReason',
     ]
 
 
@@ -44,8 +47,30 @@ class ChannelClosedError(RedisError):
 
 
 class ConnectionClosedError(RedisError):
-    """Raised if connection to server was closed."""
+    """Raised if connection to server was closed.
+
+    Has additional `reason` attribute holding CloseReason enum value or None.
+    """
+    def __init__(self, message, *, reason=None):
+        super().__init__(message)
+        self.reason = reason
 
 
 class PoolClosedError(RedisError):
     """Raised if pool is closed."""
+
+
+@enum.unique
+class CloseReason(enum.IntEnum):
+    """Connection close reasons enum."""
+    # server-side close reason / error (eg: max clients)
+    ServerClose = 1
+    # exceptions/errors
+    Cancelled = 2
+    ProtocolError = 3
+    ReadError = 4
+    # explicit close by client (eg: in Pool.release())
+    ExplicitClose = 5
+    PoolMultiExec = 6
+    PoolPubSub = 7
+    PoolDBMismatch = 8

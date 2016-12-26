@@ -9,6 +9,7 @@ from aioredis import (
     RedisError,
     ReplyError,
     Channel,
+    CloseReason,
     )
 
 
@@ -98,6 +99,7 @@ def test_close_connection__tcp(create_connection, loop, server):
     conn = loop.run_until_complete(create_connection(
         server.tcp_address, loop=loop))
     conn.close()
+    assert conn.close_reason is CloseReason.ExplicitClose
     with pytest.raises(ConnectionClosedError):
         loop.run_until_complete(conn.select(1))
 
@@ -105,12 +107,14 @@ def test_close_connection__tcp(create_connection, loop, server):
         server.tcp_address, loop=loop))
     with pytest.raises(ConnectionClosedError):
         conn.close()
+        assert conn.close_reason is CloseReason.ExplicitClose
         fut = conn.select(1)
         loop.run_until_complete(fut)
 
     conn = loop.run_until_complete(create_connection(
         server.tcp_address, loop=loop))
     conn.close()
+    assert conn.close_reason is CloseReason.ExplicitClose
     with pytest.raises(ConnectionClosedError):
         conn.execute_pubsub('subscribe', 'channel:1')
 
@@ -120,12 +124,14 @@ def test_close_connection__socket(create_connection, loop, server):
     conn = yield from create_connection(
         server.unixsocket, loop=loop)
     conn.close()
+    assert conn.close_reason is CloseReason.ExplicitClose
     with pytest.raises(ConnectionClosedError):
         yield from conn.select(1)
 
     conn = yield from create_connection(
         server.unixsocket, loop=loop)
     conn.close()
+    assert conn.close_reason is CloseReason.ExplicitClose
     with pytest.raises(ConnectionClosedError):
         yield from conn.execute_pubsub('subscribe', 'channel:1')
 
@@ -156,6 +162,7 @@ def test_wait_closed(create_connection, loop, server):
     conn = yield from create_connection(address, loop=loop)
     reader_task = conn._reader_task
     conn.close()
+    assert conn.close_reason is CloseReason.ExplicitClose
     assert not reader_task.done()
     yield from conn.wait_closed()
     assert reader_task.done()
@@ -168,6 +175,7 @@ def test_cancel_wait_closed(create_connection, loop, server):
     conn = yield from create_connection(address, loop=loop)
     reader_task = conn._reader_task
     conn.close()
+    assert conn.close_reason is CloseReason.ExplicitClose
     task = async_task(conn.wait_closed(), loop=loop)
 
     # Make sure the task is cancelled
@@ -398,3 +406,52 @@ def test_execute_pubsub_errors(create_connection, loop, server):
         sub.execute_pubsub(
             'punsubscribe',
             Channel('chan:1', is_pattern=False, loop=loop))
+
+
+@pytest.mark.run_loop
+def test_close_reason__quit(create_connection, server, loop):
+    conn = yield from create_connection(server.tcp_address, loop=loop)
+    assert not conn.closed
+    assert conn.close_reason is None
+    ok = yield from conn.execute("quit")
+    yield from asyncio.sleep(0, loop=loop)
+    assert ok == b'OK'
+    assert conn.closed
+    assert conn.close_reason is CloseReason.ServerClose
+
+
+@pytest.mark.run_loop
+def test_close_reason__error(create_connection, server, loop):
+    conn = yield from create_connection(server.tcp_address, loop=loop)
+    assert not conn.closed
+    assert conn.close_reason is None
+    conn._reader.feed_data(b'not good redis protocol response')
+    with pytest.raises(ProtocolError):
+        yield from conn.execute("ping")
+    assert conn.closed
+    assert conn.close_reason is CloseReason.ProtocolError
+
+
+@pytest.mark.run_loop
+def test_close_reason__explicit_close(create_connection, server, loop):
+    conn = yield from create_connection(server.tcp_address, loop=loop)
+    assert not conn.closed
+    assert conn.close_reason is None
+    conn.close()
+    yield from conn.wait_closed()
+    assert conn.closed
+    assert conn.close_reason is CloseReason.ExplicitClose
+
+
+@pytest.mark.run_loop
+def test_close_reason__no_override(create_connection, server, loop):
+    conn = yield from create_connection(server.tcp_address, loop=loop)
+    assert not conn.closed
+    assert conn.close_reason is None
+    conn.close_reason = 'foo'
+    conn.close()
+    yield from conn.wait_closed()
+
+    assert conn.close_reason is 'foo'
+    conn.close_reason = CloseReason.ExplicitClose
+    assert conn.close_reason is 'foo'

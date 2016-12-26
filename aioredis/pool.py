@@ -6,7 +6,7 @@ import warnings
 from .commands import create_redis, Redis
 from .log import logger
 from .util import async_task, _NOTSET
-from .errors import PoolClosedError
+from .errors import PoolClosedError, CloseReason
 
 
 PY_35 = sys.version_info >= (3, 5)
@@ -201,11 +201,11 @@ class RedisPool:
             if conn.in_transaction:
                 logger.warning(
                     "Connection %r is in transaction, closing it.", conn)
-                conn.close()
+                conn.close(reason=CloseReason.PoolMultiExec)
             elif conn.in_pubsub:
                 logger.warning(
                     "Connection %r is in subscribe mode, closing it.", conn)
-                conn.close()
+                conn.close(reason=CloseReason.PoolPubSub)
             elif conn.db == self.db:
                 if self.maxsize and self.freesize < self.maxsize:
                     self._pool.append(conn)
@@ -213,7 +213,7 @@ class RedisPool:
                     # consider this connection as old and close it.
                     conn.close()
             else:
-                conn.close()
+                conn.close(reason=CloseReason.PoolDBMismatch)
         # FIXME: check event loop is not closed
         async_task(self._wakeup(), loop=self._loop)
 

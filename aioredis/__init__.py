@@ -12,12 +12,13 @@ from .errors import (
     ChannelClosedError,
     WatchVariableError,
     PoolClosedError,
+    CloseReason,
     )
 
 
 __version__ = '0.2.9'
 
-# make pyflakes happy
+# make pyflakes happy   # XXX: make __all__
 (create_connection, RedisConnection,
  create_redis, create_reconnecting_redis, Redis,
  create_pool, RedisPool, Channel,
@@ -25,4 +26,5 @@ __version__ = '0.2.9'
  PipelineError, MultiExecError, ConnectionClosedError,
  ChannelClosedError, WatchVariableError,
  PoolClosedError,
+ CloseReason,
  )

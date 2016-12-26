@@ -23,6 +23,7 @@ from .errors import (
     ProtocolError,
     ReplyError,
     WatchVariableError,
+    CloseReason,
     )
 from .log import logger
 
@@ -111,6 +112,7 @@ class RedisConnection:
         self._db = 0
         self._closing = False
         self._closed = False
+        self._close_reason = None
         self._close_waiter = create_future(loop=self._loop)
         self._reader_task.add_done_callback(self._close_waiter.set_result)
         self._in_transaction = None
@@ -130,12 +132,18 @@ class RedisConnection:
             try:
                 data = yield from self._reader.read(MAX_CHUNK_SIZE)
             except asyncio.CancelledError:
+                self.close_reason = CloseReason.Cancelled
                 break
             except Exception as exc:
                 # XXX: for QUIT command connection error can be received
                 #       before response
+                # NOTE: maybe error should be propagated to _do_close
                 logger.error("Exception on data read %r", exc, exc_info=True)
+                self.close_reason = CloseReason.ReadError
                 break
+            # TODO: maybe check data == b'' and at_eof()?
+            # if data == b'' and self._reader.at_eof():
+            #     self._close_reason = CloseReason.ServerClose
             self._parser.feed(data)
             while True:
                 try:
@@ -144,6 +152,7 @@ class RedisConnection:
                     # ProtocolError is fatal
                     # so connection must be closed
                     self._closing = True
+                    self.close_reason = CloseReason.ProtocolError
                     self._loop.call_soon(self._do_close, exc)
                     if self._in_transaction is not None:
                         self._transaction_error = exc
@@ -156,6 +165,7 @@ class RedisConnection:
                     else:
                         self._process_data(obj)
         self._closing = True
+        self.close_reason = CloseReason.ServerClose
         self._loop.call_soon(self._do_close, None)
 
     def _process_data(self, obj):
@@ -217,9 +227,11 @@ class RedisConnection:
         * ReplyError on redis '-ERR' resonses.
         * ProtocolError when response can not be decoded meaning connection
           is broken.
+        * ConnectionClosedError when connection is closed or corrupted.
         """
         if self._reader is None or self._reader.at_eof():
-            raise ConnectionClosedError("Connection closed or corrupted")
+            raise ConnectionClosedError("Connection closed or corrupted",
+                                        reason=self.close_reason)
         if command is None:
             raise TypeError("command must not be None")
         if None in set(args):
@@ -259,7 +271,8 @@ class RedisConnection:
         assert command in _PUBSUB_COMMANDS, (
             "Pub/Sub command expected", command)
         if self._reader is None or self._reader.at_eof():
-            raise ConnectionClosedError("Connection closed or corrupted")
+            raise ConnectionClosedError("Connection closed or corrupted",
+                                        reason=self.close_reason)
         if None in set(channels):
             raise TypeError("args must not contain None")
         if not len(channels):
@@ -281,13 +294,18 @@ class RedisConnection:
         self._writer.write(cmd)
         return asyncio.gather(*res, loop=self._loop)
 
-    def close(self):
+    def close(self, *, reason=CloseReason.ExplicitClose):
         """Close connection."""
-        self._do_close(None)
+        # NOTE: `reason` keyword-only parameter must be used by Pool only.
+        self._do_close(None, reason=reason)
 
-    def _do_close(self, exc):
+    def _do_close(self, exc, reason=None):
         if self._closed:
             return
+        self.close_reason = reason
+        # elif reason is not None:  # warn about reason overwrite
+        #     logger.warning("Close reason already set (%r): %r",
+        #                    self.close_reason, reason)
         self._closed = True
         self._closing = False
         self._writer.transport.close()
@@ -310,6 +328,7 @@ class RedisConnection:
             _, ch = self._pubsub_patterns.popitem()
             logger.debug("Closing pubsub pattern %r", ch)
             ch.close()
+        # logger.debug("Connection closed with reason: %r", self.close_reason)
 
     @property
     def closed(self):
@@ -319,6 +338,17 @@ class RedisConnection:
             self._closing = closed = True
             self._loop.call_soon(self._do_close, None)
         return closed
+
+    @property
+    def close_reason(self):
+        """Close reason (CloseReason enum variant) or None."""
+        return self._close_reason
+
+    @close_reason.setter
+    def close_reason(self, value):
+        # keep first reason set
+        if self._close_reason is None:
+            self._close_reason = value
 
     @asyncio.coroutine
     def wait_closed(self):
