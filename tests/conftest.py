@@ -472,10 +472,15 @@ def _proc():
     try:
         yield run
     finally:
+        print('='*90)
+        print("Shuttind down {} processes...".format(len(processes)))
+        ts = time.time()
         while processes:
             proc = processes.pop(0)
             proc.terminate()
             proc.wait()
+        print("All shut down in {}s".format(int(time.time() - ts)))
+        print('='*90)
         for path in tmp_files:
             try:
                 os.remove(path)
