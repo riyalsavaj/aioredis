@@ -52,6 +52,7 @@ class SentinelPool:
     Holds connection pools to known and discovered (TBD) Sentinels
     as well as services' connections.
     """
+    _monitor_channels = frozenset(('+odown',))
 
     def __init__(self, sentinels, *, db=None, password=None, ssl=None,
                  encoding=None, parser=None, minsize, maxsize, timeout,
@@ -225,7 +226,9 @@ class SentinelPool:
         # TODO: discover peer sentinels
         for pool in self._pools:
             await pool.execute_pubsub(
-                b'psubscribe', self._monitor.pattern('*'))
+                b'subscribe',
+                *[self._monitor.channel(name)
+                  for name in self._monitor_channels])
 
     async def _connect_sentinel(self, address, timeout, pools):
         """Try to connect to specified Sentinel returning either
