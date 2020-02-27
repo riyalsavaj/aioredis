@@ -412,19 +412,34 @@ class SortedSetCommandsMixin:
     def zunionstore(self, destkey, key, *keys,
                     with_weights=False, aggregate=None):
         """Add multiple sorted sets and store result in a new key."""
-        keys = (key,) + keys
+        print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&", with_weights)
+        # with_weights = True
+        print(type(keys), type([key]))
+        print(keys)
+        aggregate = "ZSET_AGGREGATE_SUM"
+        keys = keys[0]
+        print("111111111111111111111111111111111111111")
         numkeys = len(keys)
+        print("222222222222222222222222222222222")
         args = []
+        print("3333333333333333333333333333333333333333")
         if with_weights:
+            print("4444444444444444444444444444444444444444444444444")
             assert all(isinstance(val, (list, tuple)) for val in keys), (
                 "All key arguments must be (key, weight) tuples")
             weights = ['WEIGHTS']
+            print("5555555555555555555555555555555555")
             for key, weight in keys:
                 args.append(key)
                 weights.append(weight)
+            print("66666666666666666666666666666666666666")
             args.extend(weights)
         else:
+            print("7777777777777777777777777777777777777777777777777")
             args.extend(keys)
+        print("888888888888888888888888888888888888888")
+        print(args)
+        print("\n\n\n\n\n\n\n\n\n\n\n")
 
         if aggregate is self.ZSET_AGGREGATE_SUM:
             args.extend(('AGGREGATE', 'SUM'))
@@ -432,6 +447,11 @@ class SortedSetCommandsMixin:
             args.extend(('AGGREGATE', 'MAX'))
         elif aggregate is self.ZSET_AGGREGATE_MIN:
             args.extend(('AGGREGATE', 'MIN'))
+
+        print(destkey)
+        print(numkeys)
+        print(args)
+        print("\n\n\n\n\n\n\n\n\n\n\n")
         fut = self.execute(b'ZUNIONSTORE', destkey, numkeys, *args)
         return fut
 
