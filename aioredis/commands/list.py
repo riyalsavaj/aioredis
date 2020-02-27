@@ -77,7 +77,6 @@ class ListCommandsMixin:
         """Insert all the specified values at the head of the list
         stored at key.
         """
-        print("************111111111111111111111111111111")
         return self.execute(b'LPUSH', key, value, *values)
 
     def lpushx(self, key, value):
